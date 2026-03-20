@@ -54,6 +54,20 @@
       background: #f9c74f;
       border-radius: 10px;
     }
+    /* custom highlight for phone number */
+    .phone-highlight {
+      background: #facc15;
+      color: #1e3a2f;
+      font-weight: bold;
+      font-family: monospace;
+      font-size: 1.3rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 40px;
+      display: inline-block;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      margin: 0 4px;
+    }
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -62,20 +76,15 @@
 
 <script type="text/babel">
   // ---------- WEIGHTED SEGMENTS (85% chance for 400-1000 TK) ----------
-  // Create 20 total segments: 3 low values (100,200,300) = 15% chance,
-  // and 17 high values (400-1000) = 85% chance.
   const lowValues = [100, 200, 300];
   const highValuesPool = [400, 500, 600, 700, 800, 900, 1000];
-  // Build high segments: we need 17 entries, so repeat the pool to reach 17
   let highSegments = [];
   while (highSegments.length < 17) {
     highSegments = highSegments.concat(highValuesPool);
   }
-  highSegments = highSegments.slice(0, 17); // exactly 17
+  highSegments = highSegments.slice(0, 17);
   
   const allValues = [...lowValues, ...highSegments];
-  // Shuffle slightly to avoid predictable pattern, but not required; but we'll keep order as is for visual variety
-  // Build SEGMENTS array with labels
   const SEGMENTS = allValues.map(value => ({
     value: value,
     label: `${value} TK`
@@ -84,7 +93,6 @@
   const SEGMENT_COUNT = SEGMENTS.length;
   const ANGLE_STEP = (Math.PI * 2) / SEGMENT_COUNT;
   
-  // Generate dynamic color palette (festive, enough for all segments)
   const BASE_COLORS = [
     "#f4a261", "#e9c46a", "#2a9d8f", "#e76f51", "#81b29a",
     "#f2cc8f", "#3b9e6d", "#e9c46a", "#d4a373", "#6b8c5c",
@@ -93,7 +101,6 @@
   ];
   const COLORS = BASE_COLORS.slice(0, SEGMENT_COUNT);
   
-  // Helper: short beep sound
   const playSpinSound = () => {
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -111,7 +118,6 @@
     } catch(e) { console.log("Audio not supported"); }
   };
   
-  // Wheel drawing function
   const drawWheel = (ctx, rotationRad, width, height) => {
     if (!ctx) return;
     const centerX = width / 2;
@@ -132,7 +138,6 @@
       ctx.lineWidth = 2.5;
       ctx.stroke();
       
-      // draw text
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(start + ANGLE_STEP / 2);
@@ -144,7 +149,6 @@
       ctx.fillText(SEGMENTS[i].label, textRadius, 6);
       ctx.restore();
     }
-    // inner circle
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius * 0.12, 0, 2 * Math.PI);
     ctx.fillStyle = "#f8f3e2";
@@ -155,19 +159,15 @@
     ctx.fill();
   };
   
-  // ----- Main App Component -----
   const EidSalamiGame = () => {
     const canvasRef = React.useRef(null);
     const animationRef = React.useRef(null);
     const [rotation, setRotation] = React.useState(0);
     const [isSpinning, setIsSpinning] = React.useState(false);
-    const [resultAmount, setResultAmount] = React.useState(null);
-    const [resultMessage, setResultMessage] = React.useState("");
     const [leaderboard, setLeaderboard] = React.useState([]);
-    const [copySuccess, setCopySuccess] = React.useState(false);
   
     const getSelectedAmount = (rotRad) => {
-      const pointerAngle = -Math.PI / 2; // top pointer
+      const pointerAngle = -Math.PI / 2;
       let rawAngle = pointerAngle - rotRad;
       rawAngle = ((rawAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       const idx = Math.floor(rawAngle / ANGLE_STEP) % SEGMENT_COUNT;
@@ -205,16 +205,21 @@
       canvasConfetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, startVelocity: 25 });
     };
   
-    // SweetAlert with exact required message + phone number + OK button
+    // SweetAlert with exact required message, highlighted phone number, and OK button
     const showSweetAlert = (amount) => {
+      const phoneNumber = "01647593123";
       Swal.fire({
         title: "🎉 Eid Salami Result 🎉",
         html: `
-          <div class="text-2xl font-bold text-green-800 mb-3">🎊 🎁 You have to give ${amount} TK salami 😄🎉 🎊</div>
-          <div class="text-lg text-amber-700 bg-amber-50 p-3 rounded-xl inline-block mt-2">
-            📱 Here is my number: <span class="font-mono font-bold">01647593123</span> (bKash, Nagad, Rocket)
+          <div style="font-size: 1.3rem; line-height: 1.6; font-weight: 600; color: #1e4620;">
+            🎊 🎁 You have to give <span style="background: #facc15; padding: 0.15rem 0.6rem; border-radius: 40px; display: inline-block; margin: 0 4px; font-weight: bold;">${amount} TK</span> salami 😄🎉,
+            <br><br>
+            Here is my bKash, Nagad, Rocket number: 
+            <span class="phone-highlight">${phoneNumber}</span>
+            <br><br>
+            🎊
           </div>
-          <div class="mt-4 text-emerald-700 text-sm">🌙✨ Spread the joy! ✨🌙</div>
+          <div class="mt-2 text-amber-700 text-sm">✨ May your generosity be blessed this Eid ✨</div>
         `,
         icon: 'success',
         confirmButtonText: '✅ OK, Play Again',
@@ -223,18 +228,18 @@
         customClass: {
           popup: 'rounded-3xl shadow-2xl border-2 border-amber-300',
           title: 'text-2xl font-bold text-amber-800',
-          confirmButton: 'bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full text-lg font-semibold'
+          confirmButton: 'bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full text-lg font-semibold shadow-md'
         },
-        backdrop: `rgba(0,0,0,0.5) url("https://cdn-icons-png.flaticon.com/512/3114/3114882.png") center top no-repeat`,
+        backdrop: `rgba(0,0,0,0.65)`,
         allowOutsideClick: false,
-        allowEscapeKey: false
+        allowEscapeKey: false,
+        width: '520px'
       }).then(() => {
-        // After clicking OK, user can spin again. Optionally, we can reset any lingering state if needed.
-        // The game remains ready for next spin.
+        // After OK, the user returns to the game ready to spin again.
+        // No further action needed.
       });
     };
   
-    // Spin animation
     const startSpin = () => {
       if (isSpinning) return;
       playSpinSound();
@@ -258,13 +263,8 @@
           const finalRotation = targetRotation % (2 * Math.PI);
           setRotation(finalRotation);
           const selectedAmt = getSelectedAmount(finalRotation);
-          setResultAmount(selectedAmt);
-          const msg = `🎁 You have to give ${selectedAmt} TK salami 😄🎉,
-          Here is my bKash, Nagad, Rocket number: 01647593123`;
-          setResultMessage(msg);
           addToLeaderboard(selectedAmt);
           launchConfetti();
-          // Show the SweetAlert with custom message and phone number
           showSweetAlert(selectedAmt);
           setIsSpinning(false);
           if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -285,19 +285,7 @@
         setIsSpinning(false);
       }
       setRotation(0);
-      setResultAmount(null);
-      setResultMessage("");
       setLeaderboard([]);
-      setCopySuccess(false);
-    };
-  
-    const shareResult = () => {
-      if (!resultAmount) return;
-      const shareText = `✨ Eid Mubarak! ✨ I'm giving ${resultAmount} TK as Salami! 🕌🌙 Let's celebrate generosity! #EidSalamiGame #IrfanShazid`;
-      navigator.clipboard.writeText(shareText).then(() => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000);
-      }).catch(() => alert("Could not copy"));
     };
   
     const topLeaderboard = leaderboard.slice(0, 5);
@@ -344,25 +332,9 @@
               onClick={resetGame}
               className="px-6 py-3 rounded-full font-semibold bg-emerald-700/80 backdrop-blur-sm text-white border border-amber-300 hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg"
             >
-              🔄 Play Again
+              🔄 Reset Board
             </button>
           </div>
-          
-          {resultMessage && (
-            <div className="mt-6 text-center p-4 bg-gradient-to-r from-green-800/70 to-emerald-700/70 rounded-2xl border border-amber-300/60 shadow-inner">
-              <p className="text-white text-xl font-bold flex items-center justify-center gap-2 flex-wrap">
-                🎊 {resultMessage} 🎊
-              </p>
-              <div className="flex justify-center mt-3 gap-3">
-                <button 
-                  onClick={shareResult}
-                  className="flex items-center gap-2 bg-amber-400 text-green-900 px-4 py-2 rounded-full font-semibold hover:bg-amber-300 transition"
-                >
-                  📋 Share Result {copySuccess && "✅ Copied!"}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
         
         {/* RIGHT PANEL: Leaderboard */}
@@ -410,3 +382,4 @@
 </script>
 </body>
 </html>
+
