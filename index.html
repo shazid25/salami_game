@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Eid Salami Spinner | Irfan Shazid</title>
+  <!-- Tailwind CSS + Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- React & ReactDOM (with Babel for JSX) -->
+  <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Custom gradient background & pattern overlay */
+    @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Poppins:wght@300;500;700&display=swap');
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(145deg, #0a3f2c 0%, #1e5a3a 100%);
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "🌙✨";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: radial-gradient(circle at 10% 20%, rgba(255,215,0,0.08) 2%, transparent 2.5%);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .islamic-pattern {
+      background: rgba(255, 214, 94, 0.1);
+      backdrop-filter: blur(2px);
+    }
+    .wheel-shadow {
+      filter: drop-shadow(0 20px 15px rgba(0,0,0,0.3));
+    }
+    .spin-btn-glow {
+      transition: all 0.2s ease;
+    }
+    .spin-btn-glow:active {
+      transform: scale(0.96);
+    }
+    /* custom scrollbar for leaderboard */
+    .leaderboard-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .leaderboard-scroll::-webkit-scrollbar-track {
+      background: #2d6a4f;
+      border-radius: 10px;
+    }
+    .leaderboard-scroll::-webkit-scrollbar-thumb {
+      background: #f9c74f;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+<div id="root" class="w-full max-w-6xl mx-auto relative z-10"></div>
+
+<script type="text/babel">
+  // ---------- SEGMENTS DATA ----------
+  const SEGMENTS = [
+    { value: 100, label: "100 TK" },
+    { value: 200, label: "200 TK" },
+    { value: 300, label: "300 TK" },
+    { value: 400, label: "400 TK" },
+    { value: 500, label: "500 TK" },
+    { value: 600, label: "600 TK" },
+    { value: 700, label: "700 TK" },
+    { value: 800, label: "800 TK" },
+    { value: 900, label: "900 TK" },
+    { value: 1000, label: "1000 TK" }
+  ];
+  const SEGMENT_COUNT = SEGMENTS.length;
+  const ANGLE_STEP = (Math.PI * 2) / SEGMENT_COUNT;
+
+  // Color palette (festive green/gold/red accents)
+  const COLORS = [
+    "#f4a261", "#e9c46a", "#2a9d8f", "#e76f51", "#81b29a",
+    "#f2cc8f", "#3b9e6d", "#e9c46a", "#d4a373", "#6b8c5c"
+  ];
+
+  // Helper: generate a short beep sound (web audio)
+  const playSpinSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gainNode.gain.value = 0.15;
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
+      oscillator.stop(audioCtx.currentTime + 0.25);
+      // resume if suspended
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    } catch(e) { console.log("Audio not supported"); }
+  };
+
+  // Wheel Drawing Function
+  const drawWheel = (ctx, rotationRad, width, height) => {
+    if (!ctx) return;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) * 0.42;
+    ctx.clearRect(0, 0, width, height);
+    
+    for (let i = 0; i < SEGMENT_COUNT; i++) {
+      const start = i * ANGLE_STEP + rotationRad;
+      const end = (i + 1) * ANGLE_STEP + rotationRad;
+      // draw segment
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, start, end);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[i % COLORS.length];
+      ctx.fill();
+      ctx.strokeStyle = "#fef9c3";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      
+      // draw text
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(start + ANGLE_STEP / 2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const textRadius = radius * 0.7;
+      ctx.font = `bold ${Math.max(14, Math.floor(radius * 0.12))}px "Poppins", sans-serif`;
+      ctx.fillStyle = "#1f2a1b";
+      ctx.shadowBlur = 0;
+      ctx.fillText(SEGMENTS[i].label, textRadius, 6);
+      ctx.restore();
+    }
+    // inner circle design
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius * 0.12, 0, 2 * Math.PI);
+    ctx.fillStyle = "#f8f3e2";
+    ctx.shadowBlur = 0;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius * 0.07, 0, 2 * Math.PI);
+    ctx.fillStyle = "#d4af37";
+    ctx.fill();
+  };
+
+  // ----- Main App Component -----
+  const EidSalamiGame = () => {
+    const canvasRef = React.useRef(null);
+    const animationRef = React.useRef(null);
+    const [rotation, setRotation] = React.useState(0);   // radians
+    const [isSpinning, setIsSpinning] = React.useState(false);
+    const [resultAmount, setResultAmount] = React.useState(null);
+    const [resultMessage, setResultMessage] = React.useState("");
+    const [leaderboard, setLeaderboard] = React.useState([]); // store { amount, timestamp }
+    const [copySuccess, setCopySuccess] = React.useState(false);
+
+    // Helper to compute selected amount based on rotation
+    const getSelectedAmount = (rotRad) => {
+      const pointerAngle = -Math.PI / 2; // top (12 o'clock)
+      let rawAngle = pointerAngle - rotRad;
+      rawAngle = ((rawAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const idx = Math.floor(rawAngle / ANGLE_STEP) % SEGMENT_COUNT;
+      return SEGMENTS[idx].value;
+    };
+
+    // Redraw canvas whenever rotation or size changes
+    const updateCanvas = React.useCallback(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      // set actual canvas resolution
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      drawWheel(ctx, rotation, canvas.width, canvas.height);
+    }, [rotation]);
+
+    React.useEffect(() => {
+      updateCanvas();
+      window.addEventListener("resize", updateCanvas);
+      return () => window.removeEventListener("resize", updateCanvas);
+    }, [updateCanvas, rotation]);
+
+    // Add to leaderboard
+    const addToLeaderboard = (amount) => {
+      setLeaderboard(prev => {
+        const newEntry = { amount, timestamp: Date.now() };
+        const updated = [...prev, newEntry];
+        // sort descending by amount
+        updated.sort((a, b) => b.amount - a.amount);
+        // keep top 10 for display but show top 5
+        return updated.slice(0, 10);
+      });
+    };
+
+    // Launch confetti party
+    const launchConfetti = () => {
+      canvasConfetti({
+        particleCount: 130,
+        spread: 70,
+        origin: { y: 0.6 },
+        startVelocity: 20,
+        colors: ['#f4d03f', '#2ecc71', '#f1c40f', '#e67e22', '#27ae60']
+      });
+      canvasConfetti({
+        particleCount: 50,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        startVelocity: 25,
+      });
+      canvasConfetti({
+        particleCount: 50,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        startVelocity: 25,
+      });
+    };
+
+    // Show SweetAlert with result and Eid message
+    const showSweetAlert = (amount) => {
+      const eidMessages = [
+        "🌙 May your kindness shine like the crescent moon! ✨",
+        "🕌 Generosity is the true spirit of Eid. Taqabbalallahu minna wa minkum! 🌙",
+        "💚 Give with joy, and blessings will follow you. Eid Mubarak! 🌟",
+        "🍬 Spread sweetness, share smiles, and make Eid special for everyone! 🎉",
+        "🌙 As you give, may Allah bless you abundantly. Eid Mubarak from Irfan Shazid! 🌟"
+      ];
+      const randomMsg = eidMessages[Math.floor(Math.random() * eidMessages.length)];
+      Swal.fire({
+        title: `🎉 You have to give ${amount} TK Salami! 🎉`,
+        html: `<div class="text-lg">${randomMsg}</div><div class="mt-2 text-amber-600">✨ Share the joy! ✨</div>`,
+        icon: 'success',
+        background: 'linear-gradient(135deg, #fef9e6, #fff3e0)',
+        iconColor: '#f4a261',
+        confirmButtonColor: '#2a9d8f',
+        confirmButtonText: '🎁 Let’s Celebrate! 🎁',
+        backdrop: `
+          rgba(0,0,0,0.6)
+          url("https://cdn-icons-png.flaticon.com/512/1998/1998629.png")
+          left top
+          no-repeat
+        `,
+        customClass: {
+          popup: 'rounded-3xl shadow-2xl border border-amber-300',
+          title: 'font-bold text-green-800 text-2xl',
+          htmlContainer: 'text-amber-800',
+          confirmButton: 'bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full'
+        },
+        showClass: {
+          popup: 'animate__animated animate__bounceIn'
+        },
+        hideClass: {
+          popup: 'animate__animated animate__fadeOut'
+        }
+      });
+    };
+
+    // Spin animation with easing
+    const startSpin = () => {
+      if (isSpinning) return;
+      // optional sound effect
+      playSpinSound();
+      
+      setIsSpinning(true);
+      const startRotation = rotation;
+      // random extra full spins: between 1440deg (8pi) and 2880deg (16pi) + random offset
+      const extraRad = (8 * Math.PI) + (Math.random() * 8 * Math.PI);
+      const targetRotation = startRotation + extraRad;
+      const duration = 1200; // ms
+      const startTime = performance.now();
+      
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      
+      const animate = (now) => {
+        const elapsed = now - startTime;
+        let t = Math.min(1, elapsed / duration);
+        const eased = easeOutCubic(t);
+        const newRot = startRotation + (targetRotation - startRotation) * eased;
+        setRotation(newRot);
+        if (t < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          // final exact rotation modulo 2PI
+          const finalRotation = targetRotation % (2 * Math.PI);
+          setRotation(finalRotation);
+          const selectedAmt = getSelectedAmount(finalRotation);
+          setResultAmount(selectedAmt);
+          const msg = `🎁 You have to give ${selectedAmt} TK salami 😄🎉`;
+          setResultMessage(msg);
+          // add to leaderboard
+          addToLeaderboard(selectedAmt);
+          // confetti explosion!
+          launchConfetti();
+          // Show SweetAlert with custom Eid message
+          showSweetAlert(selectedAmt);
+          setIsSpinning(false);
+          if (animationRef.current) cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      };
+      
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    // Play Again: reset leaderboard, clear result, reset wheel rotation to zero
+    const resetGame = () => {
+      if (isSpinning) {
+        // cancel ongoing spin
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+        setIsSpinning(false);
+      }
+      setRotation(0);
+      setResultAmount(null);
+      setResultMessage("");
+      setLeaderboard([]);
+      setCopySuccess(false);
+    };
+    
+    // Share result to clipboard
+    const shareResult = () => {
+      if (!resultAmount) return;
+      const shareText = `✨ Eid Mubarak! ✨ I'm giving ${resultAmount} TK as Salami! 🕌🌙 Let's celebrate generosity! #EidSalamiGame #IrfanShazid`;
+      navigator.clipboard.writeText(shareText).then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      }).catch(() => alert("Could not copy"));
+    };
+    
+    // Get top 5 leaderboard (sorted already)
+    const topLeaderboard = leaderboard.slice(0, 5);
+    
+    return (
+      <div className="flex flex-col lg:flex-row gap-8 items-center justify-center p-4 lg:p-6">
+        {/* LEFT PANEL: WHEEL + ACTIONS */}
+        <div className="bg-white/20 backdrop-blur-md rounded-3xl p-5 shadow-2xl border border-amber-300/50 w-full max-w-xl">
+          {/* Eid Message */}
+          <div className="text-center mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-sm">
+              🌙✨ Eid Mubarak from Irfan Shazid ✨🌙
+            </h1>
+            <p className="text-amber-100 text-sm mt-1 font-amiri">Spread joy & generosity</p>
+          </div>
+          
+          {/* Wheel Container */}
+          <div className="relative flex justify-center items-center">
+            <div className="relative wheel-shadow">
+              <canvas 
+                ref={canvasRef}
+                className="w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] md:w-[400px] md:h-[400px] rounded-full transition-all duration-50"
+                style={{ maxWidth: '100%', height: 'auto', aspectRatio: '1/1' }}
+              />
+            </div>
+            {/* Static Pointer Indicator */}
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-5 z-20">
+              <div className="w-0 h-0 border-l-[18px] border-r-[18px] border-t-[35px] border-l-transparent border-r-transparent border-t-amber-400 drop-shadow-lg"></div>
+              <div className="w-2 h-3 bg-amber-300 mx-auto rounded-b-full"></div>
+            </div>
+          </div>
+          
+          {/* Buttons Row */}
+          <div className="flex flex-wrap justify-center gap-4 mt-8">
+            <button 
+              onClick={startSpin}
+              disabled={isSpinning}
+              className={`spin-btn-glow px-8 py-3 rounded-full font-bold text-lg transition-all shadow-lg ${
+                isSpinning 
+                ? 'bg-gray-500 cursor-not-allowed text-gray-200' 
+                : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-green-900 hover:scale-105 hover:shadow-2xl'
+              }`}
+            >
+              {isSpinning ? "🌀 SPINNING..." : "🎡 SPIN NOW 🎡"}
+            </button>
+            <button 
+              onClick={resetGame}
+              className="px-6 py-3 rounded-full font-semibold bg-emerald-700/80 backdrop-blur-sm text-white border border-amber-300 hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg"
+            >
+              🔄 Play Again
+            </button>
+          </div>
+          
+          {/* Result Display with Share */}
+          {resultMessage && (
+            <div className="mt-6 text-center p-4 bg-gradient-to-r from-green-800/70 to-emerald-700/70 rounded-2xl border border-amber-300/60 shadow-inner">
+              <p className="text-white text-xl font-bold flex items-center justify-center gap-2 flex-wrap">
+                🎊 {resultMessage} 🎊
+              </p>
+              <div className="flex justify-center mt-3 gap-3">
+                <button 
+                  onClick={shareResult}
+                  className="flex items-center gap-2 bg-amber-400 text-green-900 px-4 py-2 rounded-full font-semibold hover:bg-amber-300 transition"
+                >
+                  📋 Share Result {copySuccess && "✅ Copied!"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* RIGHT PANEL: Leaderboard + Islamic pattern */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-5 w-full max-w-md border border-amber-400/40 shadow-xl">
+          <div className="flex items-center gap-3 border-b border-amber-300/40 pb-3 mb-3">
+            <span className="text-3xl">🏆</span>
+            <h2 className="text-2xl font-bold text-amber-200">SALAMI LEADERBOARD</h2>
+            <span className="text-xl">⭐</span>
+          </div>
+          <p className="text-amber-100/80 text-sm mb-3 flex items-center gap-1">🎉 Most generous givers (Top amounts)</p>
+          {topLeaderboard.length === 0 ? (
+            <div className="text-center py-8 text-amber-100/60 italic">No spins yet. Spin the wheel to add your generosity! ✨</div>
+          ) : (
+            <div className="leaderboard-scroll max-h-[320px] overflow-y-auto pr-1">
+              {topLeaderboard.map((entry, idx) => (
+                <div key={entry.timestamp} className="flex justify-between items-center bg-gradient-to-r from-amber-900/30 to-emerald-800/30 mb-2 p-3 rounded-xl border border-amber-300/30">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-bold text-amber-300 w-8">{idx+1}.</span>
+                    <span className="font-semibold text-white">🕋 Guest</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-200 font-mono text-lg font-bold">{entry.amount} TK</span>
+                    <span className="text-emerald-300 text-sm">💰</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {leaderboard.length > 5 && (
+            <p className="text-right text-xs text-amber-200/60 mt-2">+{leaderboard.length-5} more spins recorded</p>
+          )}
+          <div className="mt-5 text-center border-t border-amber-300/30 pt-3">
+            <p className="text-amber-100 text-sm flex items-center justify-center gap-1">
+              <span>🌙</span> May your Eid be blessed! <span>✨</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Render App
+  const rootElement = document.getElementById("root");
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(<EidSalamiGame />);
+</script>
+</body>
+</html>
