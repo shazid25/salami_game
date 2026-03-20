@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Eid Salami Spinner | Irfan Shazid</title>
   <!-- Tailwind CSS + Google Fonts -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -53,6 +53,14 @@
     .leaderboard-scroll::-webkit-scrollbar-thumb {
       background: #f9c74f;
       border-radius: 10px;
+    }
+    /* smooth scroll behavior for anchor jumps */
+    html {
+      scroll-behavior: smooth;
+    }
+    /* result card highlight flash (optional) */
+    .result-highlight {
+      transition: box-shadow 0.2s ease;
     }
   </style>
 </head>
@@ -165,6 +173,11 @@
     const [resultMessage, setResultMessage] = React.useState("");
     const [leaderboard, setLeaderboard] = React.useState([]);
     const [copySuccess, setCopySuccess] = React.useState(false);
+    
+    // NEW REF: to scroll to result message after spin (mobile friendly)
+    const resultMessageRef = React.useRef(null);
+    // Optional: small hint for manual scroll (just for clarity)
+    const [showScrollHint, setShowScrollHint] = React.useState(false);
   
     const getSelectedAmount = (rotRad) => {
       const pointerAngle = -Math.PI / 2; // top pointer
@@ -205,7 +218,35 @@
       canvasConfetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, startVelocity: 25 });
     };
   
-    // SweetAlert with exact required message + phone number + OK button
+    // Smooth scroll to result message container (for mobile to see full details)
+    const scrollToResultMessage = () => {
+      // Small delay to ensure DOM is fully updated and modal is closed
+      setTimeout(() => {
+        if (resultMessageRef.current) {
+          resultMessageRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start',
+            inline: 'nearest'
+          });
+          // optional: add a tiny visual glow effect to draw attention
+          const el = resultMessageRef.current;
+          el.classList.add('ring-4', 'ring-amber-300', 'ring-offset-2', 'ring-offset-emerald-800');
+          setTimeout(() => {
+            el.classList.remove('ring-4', 'ring-amber-300', 'ring-offset-2', 'ring-offset-emerald-800');
+          }, 800);
+        } else {
+          // fallback: scroll to leaderboard if result message somehow not present
+          const leaderboardPanel = document.getElementById('leaderboard-panel');
+          if (leaderboardPanel) {
+            leaderboardPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+        // hide scroll hint after scroll triggered
+        setShowScrollHint(false);
+      }, 100);
+    };
+  
+    // SweetAlert with exact required message + phone number + OK button + auto-scroll after confirm
     const showSweetAlert = (amount) => {
       Swal.fire({
         title: "🎉 Eid Salami Result 🎉",
@@ -214,10 +255,10 @@
           <div class="text-lg text-amber-700 bg-amber-50 p-3 rounded-xl inline-block mt-2">
             📱 Here is my number: <span class="font-mono font-bold">01647593123</span> (bKash, Nagad, Rocket)
           </div>
-          <div class="mt-4 text-emerald-700 text-sm">🌙✨ Spread the joy! ✨🌙</div>
+          <div class="mt-4 text-emerald-700 text-sm">🌙✨ Scroll down after closing to see leaderboard & full message! ✨🌙</div>
         `,
         icon: 'success',
-        confirmButtonText: '✅ OK, Play Again',
+        confirmButtonText: '✅ OK, See Details & Scroll Down',
         confirmButtonColor: '#2a9d8f',
         background: 'linear-gradient(135deg, #fff9ef, #fff3e0)',
         customClass: {
@@ -229,8 +270,9 @@
         allowOutsideClick: false,
         allowEscapeKey: false
       }).then(() => {
-        // After clicking OK, user can spin again. Optionally, we can reset any lingering state if needed.
-        // The game remains ready for next spin.
+        // After user clicks OK, automatically scroll down to result message & leaderboard area
+        // so mobile users can see the rest of the messages, phone number again, and leaderboard.
+        scrollToResultMessage();
       });
     };
   
@@ -239,6 +281,8 @@
       if (isSpinning) return;
       playSpinSound();
       setIsSpinning(true);
+      // hide any old scroll hint
+      setShowScrollHint(false);
       const startRotation = rotation;
       const extraRad = (8 * Math.PI) + (Math.random() * 8 * Math.PI);
       const targetRotation = startRotation + extraRad;
@@ -269,6 +313,10 @@
           setIsSpinning(false);
           if (animationRef.current) cancelAnimationFrame(animationRef.current);
           animationRef.current = null;
+          // After spin done (alert will trigger scroll on confirm), also set a small hint that scrolling is available
+          setShowScrollHint(true);
+          // auto hide hint after 4 secs
+          setTimeout(() => setShowScrollHint(false), 4500);
         }
       };
       
@@ -289,6 +337,7 @@
       setResultMessage("");
       setLeaderboard([]);
       setCopySuccess(false);
+      setShowScrollHint(false);
     };
   
     const shareResult = () => {
@@ -303,15 +352,15 @@
     const topLeaderboard = leaderboard.slice(0, 5);
   
     return (
-      <div className="flex flex-col lg:flex-row gap-8 items-center justify-center p-4 lg:p-6">
-        {/* LEFT PANEL: WHEEL + ACTIONS */}
+      <div className="flex flex-col lg:flex-row gap-8 items-start justify-center p-4 lg:p-6">
+       {/* LEFT PANEL: WHEEL + ACTIONS */}
         <div className="bg-white/20 backdrop-blur-md rounded-3xl p-5 shadow-2xl border border-amber-300/50 w-full max-w-xl">
           <div className="text-center mb-4">
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-200 to-yellow-400 bg-clip-text text-transparent drop-shadow-sm">
               🌙✨ Eid Mubarak from Irfan Shazid ✨🌙
               May your life be filled with joy, peace, and endless happiness.
             </h1>
-            <p className="text-amber-100 text-sm mt-1 font-amiri">Spin & share generosity</p>
+            <p className="text-amber-100 text-sm mt-1 font-amiri">Spin & share generosity • Scroll for leaderboard</p>
           </div>
           
           <div className="relative flex justify-center items-center">
@@ -348,25 +397,62 @@
             </button>
           </div>
           
+          {/* Scroll Hint (animated for mobile) */}
+          {showScrollHint && !isSpinning && resultMessage && (
+            <div className="mt-3 text-center animate-pulse">
+              <span className="inline-flex items-center gap-2 bg-amber-900/70 backdrop-blur-sm text-amber-100 px-4 py-1.5 rounded-full text-sm font-medium">
+                👇 Scroll down to see leaderboard & full messages 👇
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7-7-7m14-6l-7 7-7-7" />
+                </svg>
+              </span>
+            </div>
+          )}
+          
+          {/* RESULT MESSAGE SECTION - with ref for auto scroll (target for mobile) */}
           {resultMessage && (
-            <div className="mt-6 text-center p-4 bg-gradient-to-r from-green-800/70 to-emerald-700/70 rounded-2xl border border-amber-300/60 shadow-inner">
+            <div 
+              ref={resultMessageRef}
+              className="mt-6 text-center p-4 bg-gradient-to-r from-green-800/70 to-emerald-700/70 rounded-2xl border border-amber-300/60 shadow-inner result-highlight transition-all"
+            >
               <p className="text-white text-xl font-bold flex items-center justify-center gap-2 flex-wrap">
                 🎊 {resultMessage} 🎊
               </p>
-              <div className="flex justify-center mt-3 gap-3">
+              <div className="flex justify-center mt-3 gap-3 flex-wrap">
                 <button 
                   onClick={shareResult}
                   className="flex items-center gap-2 bg-amber-400 text-green-900 px-4 py-2 rounded-full font-semibold hover:bg-amber-300 transition"
                 >
                   📋 Share Result {copySuccess && "✅ Copied!"}
                 </button>
+                <button 
+                  onClick={() => {
+                    if (resultMessageRef.current) {
+                      resultMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }}
+                  className="flex items-center gap-1 bg-emerald-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-emerald-500 transition text-sm"
+                >
+                  🔽 Scroll to message
+                </button>
+              </div>
+              <div className="mt-2 text-amber-100 text-xs bg-black/20 rounded-full inline-block px-3 py-1 mx-auto">
+                📱 Need number? 01647593123 (bKash/Nagad/Rocket)
               </div>
             </div>
           )}
+          
+          {/* Extra note about the scroll for clarity (visible always) */}
+          <div className="mt-4 text-center text-amber-200/80 text-xs flex items-center justify-center gap-1">
+            <span>💫</span> After spinning, the result card will appear — <span className="font-bold text-amber-300">scroll down</span> to see leaderboard & more info! <span>💫</span>
+          </div>
         </div>
         
-        {/* RIGHT PANEL: Leaderboard */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-5 w-full max-w-md border border-amber-400/40 shadow-xl">
+        {/* RIGHT PANEL: Leaderboard (mobile users can scroll to it after spin) */}
+        <div 
+          id="leaderboard-panel"
+          className="bg-white/10 backdrop-blur-xl rounded-3xl p-5 w-full max-w-md border border-amber-400/40 shadow-xl transition-all"
+        >
           <div className="flex items-center gap-3 border-b border-amber-300/40 pb-3 mb-3">
             <span className="text-3xl">🏆</span>
             <h2 className="text-2xl font-bold text-amber-200">SALAMI LEADERBOARD</h2>
@@ -396,8 +482,10 @@
           )}
           <div className="mt-5 text-center border-t border-amber-300/30 pt-3">
             <p className="text-amber-100 text-sm flex items-center justify-center gap-1">
-              <span>🌙</span> May your Eid be blessed! <span>✨</span>
+              <span>🌙</span> May your Eid be blessed! Share joy & Salami <span>✨</span>
             </p>
+            {/* Extra message: ensures number visibility again */}
+            <p className="text-amber-200/70 text-[11px] mt-2">📞 bKash/Nagad/Rocket: 01647593123</p>
           </div>
         </div>
       </div>
@@ -410,4 +498,3 @@
 </script>
 </body>
 </html>
-
